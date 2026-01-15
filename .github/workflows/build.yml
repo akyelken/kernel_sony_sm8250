@@ -5,33 +5,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          fetch-depth: 1
+
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
 
       - name: Setup System
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git python3
+          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git
 
-      - name: Setup Proton Clang
+      - name: Get Proton Clang
         run: |
           git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
-          echo "${GITHUB_WORKSPACE}/clang/bin" >> $GITHUB_PATH
 
       - name: Build Kernel
         run: |
+          export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
           export ARCH=arm64
-          export SUBARCH=arm64
-          
-          # Sony'nin lanetli Techpack değişkenlerini zorla tanıtıyoruz
-          export CONFIG_SND_SOC_BENGAL=y
-          export CONFIG_SND_SOC_LITO=y
+          export KBUILD_BUILD_USER="akyelken"
+          export KBUILD_BUILD_HOST="inazuma"
           
           make O=out ARCH=arm64 pdx203_defconfig
           
-          # Hata ne olursa olsun devam etmeye çalış ( -k parametresi eklendi )
-          make -k -j$(nproc --all) O=out \
+          # RAM patlamasın diye -j4 kullanıyoruz ve dtbo'yu siliyoruz
+          make -j4 O=out \
             ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -40,13 +40,11 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             KCFLAGS="-w" \
-            Image.gz dtbo.img || true
+            Image.gz
 
-      - name: Check Output
-        run: |
-          if [ -f out/arch/arm64/boot/Image.gz ]; then
-            echo "BETON DÖKÜLDÜ!"
-          else
-            echo "Hala eksik bir şeyler var."
-            exit 1
-          fi
+      - name: Upload Result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel_Image
+          path: out/arch/arm64/boot/Image.gz
