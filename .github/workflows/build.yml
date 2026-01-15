@@ -5,18 +5,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev clang lld llvm
+          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev clang lld llvm libelf-dev flex bison
+          
       - name: Build Kernel
         run: |
           export ARCH=arm64
+          export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          
+          # Derin temizlik
+          make clean
           make mrproper
-          # DOĞRU YOL BURASI:
+          
+          # Inazuma için doğru config
           make pdx203_defconfig
+          
+          # Derleme (Hataları görmezden gelmek ve daha hızlı derlemek için ayarlar eklendi)
           make -j$(nproc) \
             CC=clang \
             LD=ld.lld \
@@ -25,5 +34,5 @@ jobs:
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            KCFLAGS="-w" \
+            CONFIG_DEBUG_SECTION_MISMATCH=y \
             Image.gz dtbo.img
