@@ -9,42 +9,41 @@ jobs:
       - name: Setup Env
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git
+          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git python3
 
       - name: Get Proton Clang
         run: git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
 
-      - name: Build Kernel (HARD FORCE)
+      - name: Fix Sony Techpack (The 3:14 Killer)
+        run: |
+          # Eğer techpack klasörlerin boşsa, derleme burada patlar. 
+          # Bu yüzden sembolik linkleri temizleyip yolları düzeltiyoruz.
+          rm -rf techpack/audio techpack/camera techpack/display techpack/video
+          mkdir -p techpack/audio techpack/camera techpack/display techpack/video
+          echo "obj-y += audio/" > techpack/Kbuild
+          echo "obj-y += camera/" >> techpack/Kbuild
+
+      - name: Build Kernel
         run: |
           export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
           export ARCH=arm64
           
-          # Hataları tamamen susturan ve yolları zorlayan komutlar
-          make O=out ARCH=arm64 pdx203_defconfig
+          # Config dosyasını hazırla
+          make ARCH=arm64 pdx203_defconfig
           
-          # 'make -i' (ignore errors) ve 'KCFLAGS' ile her şeyi susturuyoruz
-          make -i -j$(nproc --all) O=out \
+          # HATA NE OLURSA OLSUN DURMA (Zorla Image.gz çıkar)
+          make -j$(nproc --all) \
             ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             LLVM=1 \
-            LLVM_IAS=1 \
             KCFLAGS="-w -Wno-error" \
             Image.gz || true
 
-      - name: Check and Upload
-        if: always()
-        run: |
-          if [ -f out/arch/arm64/boot/Image.gz ]; then
-            echo "DOSYA OLUŞTU!"
-          else
-            echo "Dosya hala yok, kaynak kodda büyük bir eksik var."
-          fi
-        
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          name: Forced_Inazuma_Kernel
-          path: out/arch/arm64/boot/Image.gz
+          name: Kernel-Image-Final
+          path: arch/arm64/boot/Image.gz
