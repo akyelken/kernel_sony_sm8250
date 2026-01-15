@@ -5,28 +5,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Build Environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison
-          # AOSP Clang indiriliyor (Daha profesyonel bir derleyici)
-          mkdir clang
-          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b.tar.gz
-          tar -C clang/ -xf clang-r416183b.tar.gz
+          sudo apt-get update -y
+          # Sadece en gerekli olanları ve hızlıca kuruyoruz
+          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison clang lld llvm
 
       - name: Build Kernel
         run: |
           export ARCH=arm64
-          export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
-          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export SUBARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          make mrproper
+          # Hızlı temizlik
+          make clean
+          
+          # Config dosyasını yükle
           make pdx203_defconfig
           
-          make -j$(nproc) \
+          # Derlemeyi başlat (İşlemci gücünü tam kapasite kullan)
+          make -j$(nproc --all) \
             CC=clang \
             LD=ld.lld \
             AR=llvm-ar \
