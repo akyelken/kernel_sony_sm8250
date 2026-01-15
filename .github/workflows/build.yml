@@ -2,48 +2,46 @@ name: Inazuma Akyelken Build
 on: [workflow_dispatch, push]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Env
+      - name: Setup System
         run: |
           sudo apt-get update
           sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git python3
 
-      - name: Get Proton Clang
-        run: git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
-
-      - name: Fix Sony Techpack (The 3:14 Killer)
+      - name: Get AOSP Clang
         run: |
-          # Eğer techpack klasörlerin boşsa, derleme burada patlar. 
-          # Bu yüzden sembolik linkleri temizleyip yolları düzeltiyoruz.
-          rm -rf techpack/audio techpack/camera techpack/display techpack/video
-          mkdir -p techpack/audio techpack/camera techpack/display techpack/video
-          echo "obj-y += audio/" > techpack/Kbuild
-          echo "obj-y += camera/" >> techpack/Kbuild
+          mkdir clang
+          # Google'ın stabil Clang sürümünü çekiyoruz
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b1.tar.gz
+          tar -C clang/ -xf clang-r416183b1.tar.gz
 
       - name: Build Kernel
         run: |
           export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
           export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          # Config dosyasını hazırla
+          # Önce temizlik
+          make ARCH=arm64 clean
           make ARCH=arm64 pdx203_defconfig
           
-          # HATA NE OLURSA OLSUN DURMA (Zorla Image.gz çıkar)
+          # Derlemeye başla
           make -j$(nproc --all) \
             ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             LLVM=1 \
-            KCFLAGS="-w -Wno-error" \
-            Image.gz || true
+            LLVM_IAS=1 \
+            KCFLAGS="-w" \
+            Image.gz
 
-      - name: Upload
+      - name: Upload Kernel
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-Image-Final
+          name: Inazuma-Kernel-Image
           path: arch/arm64/boot/Image.gz
