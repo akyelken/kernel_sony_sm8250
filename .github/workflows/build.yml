@@ -9,23 +9,23 @@ jobs:
       - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev clang lld llvm libelf-dev flex bison
-          
+          sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison
+          # AOSP Clang indiriliyor (Daha profesyonel bir derleyici)
+          mkdir clang
+          wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r416183b.tar.gz
+          tar -C clang/ -xf clang-r416183b.tar.gz
+
       - name: Build Kernel
         run: |
           export ARCH=arm64
-          export SUBARCH=arm64
+          export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
+          export CLANG_TRIPLE=aarch64-linux-gnu-
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
           
-          # Derin temizlik
-          make clean
           make mrproper
-          
-          # Inazuma için doğru config
           make pdx203_defconfig
           
-          # Derleme (Hataları görmezden gelmek ve daha hızlı derlemek için ayarlar eklendi)
           make -j$(nproc) \
             CC=clang \
             LD=ld.lld \
@@ -34,5 +34,4 @@ jobs:
             OBJCOPY=llvm-objcopy \
             OBJDUMP=llvm-objdump \
             STRIP=llvm-strip \
-            CONFIG_DEBUG_SECTION_MISMATCH=y \
             Image.gz dtbo.img
