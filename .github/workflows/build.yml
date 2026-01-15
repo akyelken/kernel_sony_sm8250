@@ -6,32 +6,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Environment
+      - name: Setup Env
         run: |
           sudo apt-get update
           sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git
 
-      - name: Download Proton Clang
-        run: |
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+      - name: Get Proton Clang
+        run: git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
 
       - name: Build Kernel
         run: |
-          export ARCH=arm64
           export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
-          
-          make mrproper
-          make pdx203_defconfig
-          
-          # Derlemeyi zorla ve hataları görmezden gel (Sadece kritik hatalarda durur)
-          make -j$(nproc --all) \
+          make O=out ARCH=arm64 pdx203_defconfig
+          # En sağlam derleme metodu: LLVM=1
+          make -j$(nproc --all) O=out \
+            ARCH=arm64 \
             CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
-            CONFIG_NO_ERROR_ON_MISMATCH=y \
+            LLVM=1 \
+            LLVM_IAS=1 \
             Image.gz dtbo.img
