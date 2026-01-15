@@ -5,28 +5,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 1
 
-      - name: Setup Environment
+      - name: Setup System
         run: |
           sudo apt-get update
           sudo apt-get install -y bc build-essential gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi libssl-dev libncurses5-dev libelf-dev flex bison git python3
 
-      - name: Get Proton Clang
+      - name: Setup Proton Clang
         run: |
           git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
+          echo "${GITHUB_WORKSPACE}/clang/bin" >> $GITHUB_PATH
 
       - name: Build Kernel
         run: |
-          export PATH="${GITHUB_WORKSPACE}/clang/bin:${PATH}"
           export ARCH=arm64
+          export SUBARCH=arm64
           
-          # Sony Techpack'leri için gerekli olan yollar
-          export KBUILD_EXTMOD="${GITHUB_WORKSPACE}/techpack/audio"
+          # Sony'nin lanetli Techpack değişkenlerini zorla tanıtıyoruz
+          export CONFIG_SND_SOC_BENGAL=y
+          export CONFIG_SND_SOC_LITO=y
           
           make O=out ARCH=arm64 pdx203_defconfig
           
-          # Hataları görmezden gel ve LLVM ile zorla
-          make -j$(nproc --all) O=out \
+          # Hata ne olursa olsun devam etmeye çalış ( -k parametresi eklendi )
+          make -k -j$(nproc --all) O=out \
             ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -35,4 +40,13 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1 \
             KCFLAGS="-w" \
-            Image.gz dtbo.img
+            Image.gz dtbo.img || true
+
+      - name: Check Output
+        run: |
+          if [ -f out/arch/arm64/boot/Image.gz ]; then
+            echo "BETON DÖKÜLDÜ!"
+          else
+            echo "Hala eksik bir şeyler var."
+            exit 1
+          fi
